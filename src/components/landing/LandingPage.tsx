@@ -51,12 +51,26 @@ const LandingPage = () => {
             </div>
             <span className="font-bold text-lg text-primary-opacity">Дети на планете</span>
           </div>
-          <button
-            onClick={() => setShowAuth(true)}
-            className="gradient-primary text-primary-foreground px-5 py-2 rounded-full text-sm font-semibold transition-all hover:shadow-elevated active:scale-95"
-          >
-            Войти
-          </button>
+          <div className="flex items-center gap-3">
+            <a
+              href="#directions"
+              className="hidden sm:inline text-sm font-medium text-secondary-opacity hover:text-primary transition-colors"
+            >
+              Направления
+            </a>
+            <a
+              href="#schedule"
+              className="hidden sm:inline text-sm font-medium text-secondary-opacity hover:text-primary transition-colors"
+            >
+              Расписание
+            </a>
+            <button
+              onClick={() => setShowAuth(true)}
+              className="gradient-primary text-primary-foreground px-5 py-2 rounded-full text-sm font-semibold transition-all hover:shadow-elevated active:scale-95"
+            >
+              Войти
+            </button>
+          </div>
         </div>
       </header>
 
@@ -75,9 +89,19 @@ const LandingPage = () => {
               <h1 className="text-3xl md:text-5xl font-bold text-primary-opacity mb-4 animate-fade-in max-w-2xl">
                 Дети на планете
               </h1>
-              <p className="text-lg md:text-xl text-secondary-opacity max-w-lg mb-6 animate-fade-in-up">
-                Развивающий центр для детей от 1 года. Творчество, наука и спорт — всё в одном месте.
-              </p>
+
+              {/* Liquid Glass info card */}
+              <div className="glass-card p-5 max-w-md mb-6 animate-fade-in-up">
+                <p className="font-semibold text-primary-opacity mb-1">Развивающий центр для детей от 1 года</p>
+                <p className="text-sm text-secondary-opacity mb-3">
+                  Творчество, наука и спорт — всё в одном месте. Более 10 направлений, опытные педагоги и уютная атмосфера.
+                </p>
+                <div className="flex items-center gap-4 text-xs text-secondary-opacity">
+                  <span className="flex items-center gap-1">📍 Ясная 14к2</span>
+                  <span className="flex items-center gap-1">🕐 Пн–Сб 9–20</span>
+                </div>
+              </div>
+
               <button
                 onClick={() => setShowAuth(true)}
                 className="gradient-primary text-primary-foreground px-8 py-3.5 rounded-full font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-95 animate-fade-in-up flex items-center gap-2"
@@ -112,7 +136,7 @@ const LandingPage = () => {
       </section>
 
       {/* Directions */}
-      <section className="py-16 px-4 bg-secondary/50">
+      <section id="directions" className="py-16 px-4 bg-secondary/50 scroll-mt-20">
         <div className="container mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-primary-opacity mb-8 text-center">
             Наши направления
@@ -139,8 +163,34 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* Schedule */}
+      <section id="schedule" className="py-16 px-4 scroll-mt-20">
+        <div className="container mx-auto max-w-2xl text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-primary-opacity mb-6">
+            Расписание занятий
+          </h2>
+          <div className="space-y-3 max-w-md mx-auto">
+            {[
+              { name: "Рисование", age: "6+", time: "Пн, Ср, Пт — 16:00" },
+              { name: "Робототехника", age: "7+", time: "Пн, Вт — 17:00" },
+              { name: "Театр", age: "1+", time: "Вт, Чт — 19:00" },
+              { name: "Шахматы", age: "4+", time: "Ср, Пт — 17:00" },
+              { name: "Музыка", age: "3+", time: "Пн, Пт — 15:00" },
+            ].map((item) => (
+              <div key={item.name} className="glass-card p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-primary-opacity">{item.name}</span>
+                  <span className="text-xs font-semibold text-primary">{item.age}</span>
+                </div>
+                <span className="text-sm text-secondary-opacity">{item.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Reviews */}
-      <section className="py-16 px-4">
+      <section className="py-16 px-4 bg-secondary/50">
         <div className="container mx-auto max-w-4xl">
           <h2 className="text-2xl md:text-3xl font-bold text-primary-opacity mb-8 text-center">
             Отзывы родителей

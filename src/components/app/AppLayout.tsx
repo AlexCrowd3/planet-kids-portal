@@ -15,6 +15,7 @@ import {
   User,
   Menu,
   X,
+  Star,
 } from "lucide-react";
 
 type TabId = "home" | "calendar" | "directions" | "notifications" | "profile";
@@ -67,20 +68,46 @@ const AppLayout = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Mobile Header (< md) */}
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 glass px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-            <Home className="w-4 h-4 text-primary-foreground" />
+      {/* Top Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 glass">
+        <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+              <Star className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-bold text-sm text-primary-opacity hidden sm:inline">Дети на планете</span>
           </div>
-          <span className="font-bold text-sm text-primary-opacity">Дети на планете</span>
+
+          {/* Desktop nav items in header */}
+          <div className="hidden md:flex items-center gap-1">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => navigateTo(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm transition-all ${
+                    isActive
+                      ? "gradient-primary text-primary-foreground font-semibold"
+                      : "text-secondary-opacity hover:bg-secondary"
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Mobile burger */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
       </header>
 
       {/* Mobile Sidebar */}
@@ -117,49 +144,11 @@ const AppLayout = () => {
       )}
 
       {/* Content */}
-      <main className="flex-1 pt-16 md:pt-0 pb-20 md:pb-24">
+      <main className="flex-1 pt-16">
         <div className="max-w-lg mx-auto">
           {renderContent()}
         </div>
       </main>
-
-      {/* Bottom Navigation (desktop and hidden on mobile) */}
-      <nav className="hidden md:flex fixed bottom-0 left-0 right-0 z-40 glass justify-center py-3 px-4">
-        <div className="flex items-center gap-2 max-w-lg w-full justify-around">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => navigateTo(tab.id)}
-                className={`bottom-nav-item ${isActive ? "active" : ""}`}
-              >
-                <tab.icon className="w-5 h-5" />
-                <span className="text-xs font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 glass py-2 px-2">
-        <div className="flex items-center justify-around">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => navigateTo(tab.id)}
-                className={`bottom-nav-item ${isActive ? "active" : ""}`}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span className="text-[10px] font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 };

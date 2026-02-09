@@ -70,13 +70,13 @@ const AppLayout = () => {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Top Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass">
-        <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
+        <div className="container mx-auto flex items-center justify-between px-4 py-3">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
               <Star className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-sm text-primary-opacity hidden sm:inline">Дети на планете</span>
+            <span className="font-bold text-sm text-primary-opacity">Дети на планете</span>
           </div>
 
           {/* Desktop nav items in header */}
@@ -135,8 +135,8 @@ const AppLayout = () => {
               ))}
             </nav>
             <div className="mt-8 pt-6 border-t border-border">
-              <p className="text-sm text-secondary-opacity">
-                👋 {user.firstName}
+              <p className="text-sm text-secondary-opacity flex items-center gap-2">
+                <User className="w-4 h-4" /> {user.firstName}
               </p>
             </div>
           </div>
@@ -145,7 +145,7 @@ const AppLayout = () => {
 
       {/* Content */}
       <main className="flex-1 pt-16">
-        <div className="max-w-lg mx-auto">
+        <div className="container mx-auto">
           {renderContent()}
         </div>
       </main>

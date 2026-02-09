@@ -14,6 +14,9 @@ import {
   Clock,
   ChevronRight,
   Sparkles,
+  Award,
+  Users,
+  Building,
 } from "lucide-react";
 
 const directions = [
@@ -58,12 +61,6 @@ const LandingPage = () => {
             >
               Направления
             </a>
-            <a
-              href="#schedule"
-              className="hidden sm:inline text-sm font-medium text-secondary-opacity hover:text-primary transition-colors"
-            >
-              Расписание
-            </a>
             <button
               onClick={() => setShowAuth(true)}
               className="gradient-primary text-primary-foreground px-5 py-2 rounded-full text-sm font-semibold transition-all hover:shadow-elevated active:scale-95"
@@ -97,8 +94,12 @@ const LandingPage = () => {
                   Творчество, наука и спорт — всё в одном месте. Более 10 направлений, опытные педагоги и уютная атмосфера.
                 </p>
                 <div className="flex items-center gap-4 text-xs text-secondary-opacity">
-                  <span className="flex items-center gap-1">📍 Ясная 14к2</span>
-                  <span className="flex items-center gap-1">🕐 Пн–Сб 9–20</span>
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" /> Ясная 14к2
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" /> Пн–Сб 9–20
+                  </span>
                 </div>
               </div>
 
@@ -121,12 +122,14 @@ const LandingPage = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { emoji: "🎨", title: "10+ направлений", desc: "От робототехники до театра" },
-              { emoji: "👨‍🏫", title: "Опытные педагоги", desc: "Профессионалы с любовью к детям" },
-              { emoji: "🏠", title: "Уютное пространство", desc: "Современный ремонт и оборудование" },
+              { icon: Award, title: "10+ направлений", desc: "От робототехники до театра" },
+              { icon: Users, title: "Опытные педагоги", desc: "Профессионалы с любовью к детям" },
+              { icon: Building, title: "Уютное пространство", desc: "Современный ремонт и оборудование" },
             ].map((item) => (
               <div key={item.title} className="glass-card p-6 hover:shadow-elevated transition-all">
-                <div className="text-4xl mb-3">{item.emoji}</div>
+                <div className="w-12 h-12 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-3">
+                  <item.icon className="w-6 h-6 text-primary-foreground" />
+                </div>
                 <h3 className="font-bold text-primary-opacity mb-2">{item.title}</h3>
                 <p className="text-secondary-opacity text-sm">{item.desc}</p>
               </div>
@@ -163,32 +166,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Schedule */}
-      <section id="schedule" className="py-16 px-4 scroll-mt-20">
-        <div className="container mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl md:text-3xl font-bold text-primary-opacity mb-6">
-            Расписание занятий
-          </h2>
-          <div className="space-y-3 max-w-md mx-auto">
-            {[
-              { name: "Рисование", age: "6+", time: "Пн, Ср, Пт — 16:00" },
-              { name: "Робототехника", age: "7+", time: "Пн, Вт — 17:00" },
-              { name: "Театр", age: "1+", time: "Вт, Чт — 19:00" },
-              { name: "Шахматы", age: "4+", time: "Ср, Пт — 17:00" },
-              { name: "Музыка", age: "3+", time: "Пн, Пт — 15:00" },
-            ].map((item) => (
-              <div key={item.name} className="glass-card p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-primary-opacity">{item.name}</span>
-                  <span className="text-xs font-semibold text-primary">{item.age}</span>
-                </div>
-                <span className="text-sm text-secondary-opacity">{item.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Reviews */}
       <section className="py-16 px-4 bg-secondary/50">
         <div className="container mx-auto max-w-4xl">
@@ -214,7 +191,7 @@ const LandingPage = () => {
       </section>
 
       {/* Contact */}
-      <section className="py-16 px-4 bg-secondary/50">
+      <section className="py-16 px-4">
         <div className="container mx-auto max-w-2xl text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-primary-opacity mb-8">
             Контакты

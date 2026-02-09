@@ -65,8 +65,8 @@ const notificationGroups: NotificationGroup[] = [
 
 const NotificationsPage = ({ onNavigate }: NotificationsPageProps) => {
   return (
-    <div className="p-4 space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 animate-fade-in">
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigate("home")}
@@ -81,7 +81,7 @@ const NotificationsPage = ({ onNavigate }: NotificationsPageProps) => {
         </button>
       </div>
 
-      <div className="space-y-5">
+      <div className="max-w-2xl space-y-5">
         {notificationGroups.map((group) => (
           <div key={group.label}>
             <h2 className="font-bold text-primary-opacity mb-3">{group.label}</h2>

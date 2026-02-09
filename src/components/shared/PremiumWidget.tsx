@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { CreditCard, Clock, Info, Award } from "lucide-react";
 
 interface PremiumWidgetProps {
   compact?: boolean;
@@ -16,11 +17,11 @@ const PremiumWidget = ({ compact = false, onSubscribeClick }: PremiumWidgetProps
           onClick={onSubscribeClick}
         >
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">💳</span>
+            <CreditCard className="w-5 h-5" />
             <span className="font-bold">Premium+</span>
           </div>
           <div className="flex items-center gap-1 text-white/80 text-xs">
-            <span>⏰</span>
+            <Clock className="w-3.5 h-3.5" />
             <span>Активна до {user.subscriptionDate}</span>
           </div>
         </div>
@@ -42,17 +43,17 @@ const PremiumWidget = ({ compact = false, onSubscribeClick }: PremiumWidgetProps
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xl">💳</span>
+          <CreditCard className="w-5 h-5" />
           <span className="font-bold text-lg">Premium+</span>
         </div>
         <span className="text-sm font-semibold text-yellow-300">Активно</span>
       </div>
       <div className="flex items-center gap-2 text-white/80 text-sm mb-1">
-        <span>ℹ️</span>
+        <Info className="w-4 h-4" />
         <span>Подписка премиум позволяет посещать все занятия нашего центра.</span>
       </div>
       <div className="flex items-center gap-1 text-white/80 text-sm mt-2">
-        <span>⏰</span>
+        <Clock className="w-4 h-4" />
         <span>Активна до {user.subscriptionDate}</span>
       </div>
     </div>

@@ -71,8 +71,8 @@ const HomePage = ({ onNavigate }: HomePageProps) => {
               </div>
             </div>
             <div className="glass-card p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-notification-success" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-primary-opacity">12</p>

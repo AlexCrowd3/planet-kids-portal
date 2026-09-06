@@ -1,291 +1,691 @@
 import { useState } from "react";
-import { X, LogIn, Phone, ArrowRight, ChevronLeft, UserPlus, User, Plus, SkipForward } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, Lock, Phone, User, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  onLogin: () => void;
+  onLogin?: (userData?: any) => void;
 }
 
-type AuthStep = "choose" | "login" | "phone" | "phone-code" | "register" | "register-code" | "register-children";
+type AuthStep = "choose" | "phone" | "phone-code" | "register" | "register-code" | "register-children";
 
-const AuthModal = ({ open, onClose, onLogin }: AuthModalProps) => {
+interface ChildForm {
+  firstName: string;
+  lastName: string;
+  birthDate: string;
+}
+
+const TEST_CODE = "1234";
+
+const normalizePhone = (phone: string) => {
+  return phone.replace(/\D/g, "");
+};
+
+const formatPhone = (value: string) => {
+  const digits = normalizePhone(value);
+
+  if (!digits) {
+    return "";
+  }
+
+  let normalized = digits;
+
+  if (normalized.startsWith("8")) {
+    normalized = `7${normalized.slice(1)}`;
+  }
+
+  if (!normalized.startsWith("7")) {
+    normalized = `7${normalized}`;
+  }
+
+  normalized = normalized.slice(0, 11);
+
+  let result = "+7";
+
+  if (normalized.length > 1) {
+    result += ` (${normalized.slice(1, 4)}`;
+  }
+
+  if (normalized.length >= 4) {
+    result += ")";
+  }
+
+  if (normalized.length > 4) {
+    result += ` ${normalized.slice(4, 7)}`;
+  }
+
+  if (normalized.length > 7) {
+    result += `-${normalized.slice(7, 9)}`;
+  }
+
+  if (normalized.length > 9) {
+    result += `-${normalized.slice(9, 11)}`;
+  }
+
+  return result;
+};
+
+export default function AuthModal({ open, onClose, onLogin }: AuthModalProps) {
+  const { login, register } = useAuth();
+
   const [step, setStep] = useState<AuthStep>("choose");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+
+  const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
-  const [regName, setRegName] = useState("");
-  const [regPhone, setRegPhone] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regPasswordConfirm, setRegPasswordConfirm] = useState("");
-  const [children, setChildren] = useState<string[]>([""]);
 
-  if (!open) return null;
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
-  const resetState = () => {
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+
+  const [children, setChildren] = useState<ChildForm[]>([]);
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  if (!open) {
+    return null;
+  }
+
+  const resetModal = () => {
     setStep("choose");
-    setEmail("");
-    setPassword("");
-    setPhoneNumber("");
+    setPhone("");
     setCode("");
-    setRegName("");
-    setRegPhone("");
-    setRegPassword("");
-    setRegPasswordConfirm("");
-    setChildren([""]);
+    setFirstName("");
+    setLastName("");
+    setPassword("");
+    setPasswordConfirm("");
+    setChildren([]);
+    setShowPassword(false);
+    setShowPasswordConfirm(false);
+    setError("");
+    setIsLoading(false);
   };
 
   const handleClose = () => {
-    resetState();
+    resetModal();
     onClose();
   };
 
-  const handleFinalLogin = () => {
-    resetState();
-    onLogin();
+  const handlePhoneChange = (value: string) => {
+    setPhone(formatPhone(value));
+    setError("");
   };
 
-  const addChild = () => setChildren([...children, ""]);
-  const updateChild = (idx: number, val: string) => {
-    const updated = [...children];
-    updated[idx] = val;
-    setChildren(updated);
+  const sendTestCode = () => {
+    const normalizedPhone = normalizePhone(phone);
+
+    if (normalizedPhone.length !== 11) {
+      setError("Введите корректный номер телефона");
+      return;
+    }
+
+    setError("");
+    setCode("");
+    setStep("phone-code");
   };
-  const removeChild = (idx: number) => {
-    if (children.length > 1) setChildren(children.filter((_, i) => i !== idx));
-  };
 
-  const inputClass = "w-full px-4 py-3 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all";
+  const handlePhoneCodeSubmit = async () => {
+    if (code !== TEST_CODE) {
+      setError("Неверный код. Для тестирования используйте 1234");
+      return;
+    }
 
-  const renderStep = () => {
-    switch (step) {
-      case "choose":
-        return (
-          <div className="space-y-4">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 rounded-full gradient-primary flex items-center justify-center mx-auto mb-4">
-                <LogIn className="w-8 h-8 text-primary-foreground" />
-              </div>
-              <h2 className="text-2xl font-bold text-primary-opacity">Добро пожаловать!</h2>
-              <p className="text-secondary-opacity text-sm mt-2">Выберите способ входа</p>
-            </div>
-            <button onClick={() => setStep("login")} className="w-full glass-card px-4 py-4 flex items-center gap-3 hover:shadow-elevated transition-all">
-              <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
-                <LogIn className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div className="text-left flex-1">
-                <p className="font-semibold text-primary-opacity">Войти по логину</p>
-                <p className="text-xs text-secondary-opacity">Email и пароль</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            </button>
-            <button onClick={() => setStep("phone")} className="w-full glass-card px-4 py-4 flex items-center gap-3 hover:shadow-elevated transition-all">
-              <div className="w-10 h-10 rounded-full gradient-orange flex items-center justify-center">
-                <Phone className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div className="text-left flex-1">
-                <p className="font-semibold text-primary-opacity">Войти по телефону</p>
-                <p className="text-xs text-secondary-opacity">Код подтверждения в SMS</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            </button>
-            <div className="relative py-3">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center"><span className="bg-background px-3 text-xs text-muted-foreground">или</span></div>
-            </div>
-            <button onClick={() => setStep("register")} className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-              <UserPlus className="w-5 h-5" /> Зарегистрироваться
-            </button>
-          </div>
-        );
+    setIsLoading(true);
+    setError("");
 
-      case "login":
-        return (
-          <div className="space-y-4">
-            <button onClick={() => setStep("choose")} className="flex items-center gap-1 text-sm text-secondary-opacity hover:text-primary transition-colors mb-2">
-              <ChevronLeft className="w-4 h-4" /> Назад
-            </button>
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-primary-opacity">Вход в аккаунт</h2>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); handleFinalLogin(); }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Имя или Email</label>
-                <input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Введите имя или email" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Пароль</label>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Введите пароль" className={inputClass} />
-              </div>
-              <button type="submit" className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-                Авторизоваться
-              </button>
-            </form>
-          </div>
-        );
+    try {
+      const userData = await login(phone);
 
-      case "phone":
-        return (
-          <div className="space-y-4">
-            <button onClick={() => setStep("choose")} className="flex items-center gap-1 text-sm text-secondary-opacity hover:text-primary transition-colors mb-2">
-              <ChevronLeft className="w-4 h-4" /> Назад
-            </button>
-            <div className="text-center mb-4">
-              <div className="w-14 h-14 rounded-full gradient-orange flex items-center justify-center mx-auto mb-3">
-                <Phone className="w-7 h-7 text-primary-foreground" />
-              </div>
-              <h2 className="text-xl font-bold text-primary-opacity">Вход по телефону</h2>
-              <p className="text-sm text-secondary-opacity mt-1">Мы отправим SMS с кодом подтверждения</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Номер телефона</label>
-              <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+7 (___) ___-__-__" className={inputClass} />
-            </div>
-            <button onClick={() => setStep("phone-code")} className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-              Получить код
-            </button>
-          </div>
-        );
+      if (!userData) {
+        setStep("register");
+        setIsLoading(false);
+        return;
+      }
 
-      case "phone-code":
-        return (
-          <div className="space-y-4">
-            <button onClick={() => setStep("phone")} className="flex items-center gap-1 text-sm text-secondary-opacity hover:text-primary transition-colors mb-2">
-              <ChevronLeft className="w-4 h-4" /> Назад
-            </button>
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-primary-opacity">Введите код</h2>
-              <p className="text-sm text-secondary-opacity mt-1">Код отправлен на {phoneNumber || "+7 (***)"}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Код из SMS</label>
-              <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="• • • •" maxLength={4} className={`${inputClass} text-center text-2xl tracking-[0.5em] font-bold`} />
-            </div>
-            <button onClick={handleFinalLogin} className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-              Подтвердить
-            </button>
-            <button className="w-full text-center text-sm text-secondary-opacity hover:text-primary transition-colors">
-              Отправить код повторно
-            </button>
-          </div>
-        );
-
-      case "register":
-        return (
-          <div className="space-y-4">
-            <button onClick={() => setStep("choose")} className="flex items-center gap-1 text-sm text-secondary-opacity hover:text-primary transition-colors mb-2">
-              <ChevronLeft className="w-4 h-4" /> Назад
-            </button>
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-primary-opacity">Регистрация</h2>
-              <p className="text-sm text-secondary-opacity mt-1">Создайте аккаунт в «Дети на планете»</p>
-            </div>
-            <form onSubmit={(e) => { e.preventDefault(); setStep("register-code"); }} className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Ваше имя</label>
-                <input type="text" value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="Как к вам обращаться?" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Номер телефона</label>
-                <input type="tel" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="+7 (___) ___-__-__" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Пароль</label>
-                <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="Придумайте пароль" className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Подтвердите пароль</label>
-                <input type="password" value={regPasswordConfirm} onChange={(e) => setRegPasswordConfirm(e.target.value)} placeholder="Повторите пароль" className={inputClass} />
-              </div>
-              <button type="submit" className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-                Получить код
-              </button>
-            </form>
-          </div>
-        );
-
-      case "register-code":
-        return (
-          <div className="space-y-4">
-            <button onClick={() => setStep("register")} className="flex items-center gap-1 text-sm text-secondary-opacity hover:text-primary transition-colors mb-2">
-              <ChevronLeft className="w-4 h-4" /> Назад
-            </button>
-            <div className="text-center mb-4">
-              <h2 className="text-xl font-bold text-primary-opacity">Подтверждение</h2>
-              <p className="text-sm text-secondary-opacity mt-1">Код отправлен на {regPhone || "+7 (***)"}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-secondary-opacity mb-1.5">Код из SMS</label>
-              <input type="text" value={code} onChange={(e) => setCode(e.target.value)} placeholder="• • • •" maxLength={4} className={`${inputClass} text-center text-2xl tracking-[0.5em] font-bold`} />
-            </div>
-            <button onClick={() => setStep("register-children")} className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-              Подтвердить
-            </button>
-            <button className="w-full text-center text-sm text-secondary-opacity hover:text-primary transition-colors">
-              Отправить код повторно
-            </button>
-          </div>
-        );
-
-      case "register-children":
-        return (
-          <div className="space-y-4">
-            <div className="text-center mb-4">
-              <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center mx-auto mb-3">
-                <User className="w-7 h-7 text-primary-foreground" />
-              </div>
-              <h2 className="text-xl font-bold text-primary-opacity">Добавьте детей</h2>
-              <p className="text-sm text-secondary-opacity mt-1">Это можно сделать позже в личном кабинете</p>
-            </div>
-            <div className="space-y-3">
-              {children.map((child, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={child}
-                    onChange={(e) => updateChild(idx, e.target.value)}
-                    placeholder={`Имя ребёнка ${idx + 1}`}
-                    className={`${inputClass} flex-1`}
-                  />
-                  {children.length > 1 && (
-                    <button onClick={() => removeChild(idx)} className="w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center hover:bg-destructive/20 transition-colors">
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <button onClick={addChild} className="w-full glass-card py-3 rounded-xl font-medium text-sm text-secondary-opacity hover:text-primary transition-colors flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" /> Добавить ещё ребёнка
-            </button>
-            <button onClick={handleFinalLogin} className="w-full gradient-primary text-primary-foreground py-3.5 rounded-xl font-semibold text-lg shadow-elevated hover:shadow-lg transition-all active:scale-[0.98]">
-              Завершить регистрацию
-            </button>
-            <button onClick={handleFinalLogin} className="w-full text-center text-sm text-secondary-opacity hover:text-primary transition-colors flex items-center justify-center gap-1">
-              <SkipForward className="w-4 h-4" /> Пропустить
-            </button>
-          </div>
-        );
+      onLogin?.(userData);
+      handleClose();
+    } catch (err: any) {
+      console.error("Ошибка входа:", err);
+      setError(err?.message || "Не удалось выполнить вход");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-foreground/30 backdrop-blur-sm animate-fade-in" onClick={handleClose} />
-      <div className="relative w-full max-w-md animate-scale-in max-h-[90vh] overflow-y-auto">
-        <div className="glass-card p-8 shadow-elevated">
-          <button onClick={handleClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-            <X className="w-4 h-4" />
+  const handleRegistrationSubmit = () => {
+    if (!firstName.trim()) {
+      setError("Введите имя");
+      return;
+    }
+
+    if (normalizePhone(phone).length !== 11) {
+      setError("Введите корректный номер телефона");
+      return;
+    }
+
+    if (!password) {
+      setError("Введите пароль");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Пароль должен содержать минимум 6 символов");
+      return;
+    }
+
+    if (password !== passwordConfirm) {
+      setError("Пароли не совпадают");
+      return;
+    }
+
+    setError("");
+    setStep("register-code");
+  };
+
+  const handleRegistrationCodeSubmit = () => {
+    if (code !== TEST_CODE) {
+      setError("Неверный код. Для тестирования используйте 1234");
+      return;
+    }
+
+    setError("");
+    setStep("register-children");
+  };
+
+  const addChild = () => {
+    setChildren((current) => [
+      ...current,
+      {
+        firstName: "",
+        lastName: "",
+        birthDate: "",
+      },
+    ]);
+  };
+
+  const removeChild = (index: number) => {
+    setChildren((current) => current.filter((_, childIndex) => childIndex !== index));
+  };
+
+  const updateChild = (index: number, field: keyof ChildForm, value: string) => {
+    setChildren((current) =>
+      current.map((child, childIndex) =>
+        childIndex === index
+          ? {
+              ...child,
+              [field]: value,
+            }
+          : child,
+      ),
+    );
+  };
+
+  const finishRegistration = async () => {
+    const invalidChild = children.find(
+      (child) => !child.firstName.trim() || !child.birthDate,
+    );
+
+    if (invalidChild) {
+      setError("Заполните имя и дату рождения каждого ребёнка");
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const userData = await register({
+        phone,
+        firstName,
+        lastName,
+        children,
+      });
+
+      onLogin?.(userData);
+      handleClose();
+    } catch (err: any) {
+      console.error("Ошибка регистрации:", err);
+
+      if (err?.message?.includes("already exists")) {
+        setError("Пользователь с таким номером уже существует");
+      } else {
+        setError(err?.message || "Не удалось создать пользователя");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderHeader = (title: string, subtitle?: string) => (
+    <div className="mb-7">
+      <div className="mb-4 flex items-center justify-between">
+        {step !== "choose" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              if (step === "phone") setStep("choose");
+              else if (step === "phone-code") setStep("phone");
+              else if (step === "register") setStep("phone");
+              else if (step === "register-code") setStep("register");
+              else if (step === "register-children") setStep("register-code");
+            }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+          >
+            <ArrowLeft size={18} />
           </button>
-          {renderStep()}
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            Нажимая кнопку, вы соглашаетесь с условиями использования
-          </p>
-        </div>
+        ) : (
+          <div />
+        )}
+
+        <button
+          type="button"
+          onClick={handleClose}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+
+      {subtitle && <p className="mt-2 text-sm leading-6 text-slate-500">{subtitle}</p>}
+    </div>
+  );
+
+  const renderError = () => {
+    if (!error) {
+      return null;
+    }
+
+    return (
+      <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+        {error}
+      </div>
+    );
+  };
+
+  const renderPhoneInput = () => (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-slate-700">
+        Номер телефона
+      </label>
+
+      <div className="relative">
+        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+
+        <input
+          type="tel"
+          value={phone}
+          onChange={(event) => handlePhoneChange(event.target.value)}
+          placeholder="+7 (999) 123-45-67"
+          className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+        />
       </div>
     </div>
   );
-};
 
-export default AuthModal;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+      <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+        {step === "choose" && (
+          <>
+            {renderHeader("Вход", "Войдите или создайте аккаунт, чтобы пользоваться возможностями сервиса.")}
+
+            {renderError()}
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setStep("phone");
+                }}
+                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-[#646cff] hover:bg-[#646cff]/5"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#646cff]/10 text-[#646cff]">
+                  <Phone size={20} />
+                </div>
+
+                <div>
+                  <div className="font-semibold text-slate-900">По номеру телефона</div>
+                  <div className="mt-1 text-sm text-slate-500">Получить код подтверждения</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setStep("phone");
+                }}
+                className="flex w-full items-center gap-4 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-[#646cff] hover:bg-[#646cff]/5"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                  <User size={20} />
+                </div>
+
+                <div>
+                  <div className="font-semibold text-slate-900">Войти / зарегистрироваться</div>
+                  <div className="mt-1 text-sm text-slate-500">Через подтверждение номера</div>
+                </div>
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === "phone" && (
+          <>
+            {renderHeader("Введите телефон", "Мы отправим код подтверждения на указанный номер.")}
+
+            {renderError()}
+
+            {renderPhoneInput()}
+
+            <button
+              type="button"
+              onClick={sendTestCode}
+              className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#646cff] font-semibold text-white transition hover:bg-[#5558e8]"
+            >
+              Получить код
+            </button>
+
+            <p className="mt-4 text-center text-xs text-slate-400">
+              Сейчас используется тестовый код: <b>1234</b>
+            </p>
+          </>
+        )}
+
+        {step === "phone-code" && (
+          <>
+            {renderHeader("Введите код", `Код отправлен на номер ${phone}`)}
+
+            {renderError()}
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Код подтверждения
+              </label>
+
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={code}
+                onChange={(event) => {
+                  setCode(event.target.value.replace(/\D/g, "").slice(0, 4));
+                  setError("");
+                }}
+                placeholder="1234"
+                className="h-14 w-full rounded-xl border border-slate-200 bg-white text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 outline-none transition focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+              />
+            </div>
+
+            <button
+              type="button"
+              disabled={isLoading || code.length !== 4}
+              onClick={handlePhoneCodeSubmit}
+              className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#646cff] font-semibold text-white transition hover:bg-[#5558e8] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading ? "Проверяем..." : "Продолжить"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCode("");
+                setError("");
+                setStep("phone");
+              }}
+              className="mt-3 w-full text-sm font-medium text-[#646cff] hover:underline"
+            >
+              Изменить номер
+            </button>
+          </>
+        )}
+
+        {step === "register" && (
+          <>
+            {renderHeader("Создание аккаунта", "Заполните основные данные для регистрации.")}
+
+            {renderError()}
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Имя
+                </label>
+
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    placeholder="Ваше имя"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Фамилия
+                </label>
+
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  placeholder="Ваша фамилия"
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                />
+              </div>
+
+              {renderPhoneInput()}
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Пароль
+                </label>
+
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Минимум 6 символов"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Повторите пароль
+                </label>
+
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+
+                  <input
+                    type={showPasswordConfirm ? "text" : "password"}
+                    value={passwordConfirm}
+                    onChange={(event) => setPasswordConfirm(event.target.value)}
+                    placeholder="Повторите пароль"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-11 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordConfirm((value) => !value)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  >
+                    {showPasswordConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRegistrationSubmit}
+              className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#646cff] font-semibold text-white transition hover:bg-[#5558e8]"
+            >
+              Продолжить
+            </button>
+          </>
+        )}
+
+        {step === "register-code" && (
+          <>
+            {renderHeader("Подтверждение номера", `Подтвердите номер ${phone}`)}
+
+            {renderError()}
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Код подтверждения
+              </label>
+
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                value={code}
+                onChange={(event) => {
+                  setCode(event.target.value.replace(/\D/g, "").slice(0, 4));
+                  setError("");
+                }}
+                placeholder="1234"
+                className="h-14 w-full rounded-xl border border-slate-200 bg-white text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 outline-none transition focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+              />
+            </div>
+
+            <button
+              type="button"
+              disabled={code.length !== 4}
+              onClick={handleRegistrationCodeSubmit}
+              className="mt-5 flex h-12 w-full items-center justify-center rounded-xl bg-[#646cff] font-semibold text-white transition hover:bg-[#5558e8] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Подтвердить
+            </button>
+
+            <p className="mt-4 text-center text-xs text-slate-400">
+              Сейчас используется тестовый код: <b>1234</b>
+            </p>
+          </>
+        )}
+
+        {step === "register-children" && (
+          <>
+            {renderHeader("Дети", "Добавьте детей, чтобы персонализировать ваши занятия.")}
+
+            {renderError()}
+
+            <div className="space-y-4">
+              {children.length === 0 && (
+                <div className="rounded-2xl bg-slate-50 p-5 text-center text-sm text-slate-500">
+                  Пока дети не добавлены
+                </div>
+              )}
+
+              {children.map((child, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-slate-200 p-4"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="font-semibold text-slate-900">
+                      Ребёнок {index + 1}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeChild(index)}
+                      className="text-sm text-red-500 hover:underline"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={child.firstName}
+                      onChange={(event) => updateChild(index, "firstName", event.target.value)}
+                      placeholder="Имя"
+                      className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                    />
+
+                    <input
+                      type="text"
+                      value={child.lastName}
+                      onChange={(event) => updateChild(index, "lastName", event.target.value)}
+                      placeholder="Фамилия"
+                      className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                    />
+
+                    <input
+                      type="date"
+                      value={child.birthDate}
+                      onChange={(event) => updateChild(index, "birthDate", event.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-200 px-4 text-sm outline-none transition focus:border-[#646cff] focus:ring-2 focus:ring-[#646cff]/10"
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addChild}
+                className="flex h-11 w-full items-center justify-center rounded-xl border border-dashed border-[#646cff]/40 text-sm font-semibold text-[#646cff] transition hover:bg-[#646cff]/5"
+              >
+                + Добавить ребёнка
+              </button>
+            </div>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={finishRegistration}
+              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#646cff] font-semibold text-white transition hover:bg-[#5558e8] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLoading ? "Создаём аккаунт..." : "Создать аккаунт"}
+              {!isLoading && <Check size={18} />}
+            </button>
+
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                setChildren([]);
+                finishRegistration();
+              }}
+              className="mt-3 w-full text-sm text-slate-500 hover:text-slate-700"
+            >
+              Пропустить добавление детей
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

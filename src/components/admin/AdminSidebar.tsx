@@ -8,6 +8,7 @@ import {
   GraduationCap,
   BookOpen,
   WalletCards,
+  CalendarDays
 } from "lucide-react";
 
 const nav = [
@@ -16,6 +17,11 @@ const nav = [
     to: "",
     icon: LayoutDashboard,
     end: true,
+  },
+  {
+    label: "Расписание",
+    to: "schedule",
+    icon: CalendarDays,
   },
   {
     label: "Пользователи",
@@ -73,10 +79,9 @@ const AdminSidebar = () => {
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? "bg-[#646cff] text-white shadow-[0_6px_20px_rgba(100,108,255,0.22)]"
-                    : "text-slate-500 hover:bg-[#646cff]/5 hover:text-[#646cff]"
+                `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${isActive
+                  ? "bg-[#646cff] text-white shadow-[0_6px_20px_rgba(100,108,255,0.22)]"
+                  : "text-slate-500 hover:bg-[#646cff]/5 hover:text-[#646cff]"
                 }`
               }
             >

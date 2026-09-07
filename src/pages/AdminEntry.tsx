@@ -10,6 +10,7 @@ import DebugPage from "@/components/admin/pages/DebugPage";
 import DirectionsPage from "@/components/admin/pages/DirectionsPage";
 import TeachersPage from "@/components/admin/pages/TeachersPage";
 import SubscriptionTypesPage from "@/components/admin/pages/SubscriptionTypesPage"
+import SchedulePage from "@/components/admin/pages/SchedulePage";
 
 const ADMIN_KEY = "FGVhygvR7fkjtdjyCDJKytfkuyg";
 
@@ -28,6 +29,7 @@ export default function AdminEntry() {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="debug" element={<DebugPage />} />
         <Route path="directions" element={<DirectionsPage />} />
+        <Route path="schedule" element={<SchedulePage />} />
         <Route path="teachers" element={<TeachersPage />} />
       </Route>
 

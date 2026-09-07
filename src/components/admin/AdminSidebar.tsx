@@ -99,7 +99,7 @@ const AdminSidebar = () => {
       <div className="mt-4 border-t border-slate-100 pt-4">
         <div className="rounded-xl bg-slate-50 px-4 py-3">
           <p className="text-xs font-medium text-slate-400">
-            Planet Kids
+            Дети на планете
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             Панель управления

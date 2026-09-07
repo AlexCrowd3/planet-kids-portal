@@ -34,21 +34,31 @@ interface ChildData {
   gender: string | null;
 }
 
+interface ActivityData {
+  id: string;
+  name: string;
+}
+
 interface BookingData {
   id: string;
-  schedule_id: string;
   child_id: string;
   status: string;
+  lesson_date: string;
   created_at: string;
-  schedule: {
-    id: string;
-    lesson_date: string;
-    activity_type_id: string;
-    activity: {
-      id: string;
-      name: string;
-    } | null;
-  } | null;
+  schedule_id: string;
+  type: "group" | "individual";
+  activity: ActivityData | null;
+}
+
+interface SubscriptionData {
+  id: string;
+  lessonsTotal: number;
+  lessonsLeft: number;
+  pricePerLesson: number;
+  endDate: string;
+  isActive: boolean;
+  name: string;
+  isIndividual: boolean;
 }
 
 interface ProfileStats {
@@ -101,7 +111,29 @@ const formatBirthDate = (birthDate: string) => {
   return date.toLocaleDateString("ru-RU");
 };
 
-const formatPhone = (phone: string) => {
+const formatLessonDate = (lessonDate: string) => {
+  if (!lessonDate) {
+    return "Дата не указана";
+  }
+
+  const date = new Date(`${lessonDate}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return lessonDate;
+  }
+
+  return date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+const formatPhone = (phone: string | null | undefined) => {
+  if (!phone) {
+    return "Телефон не указан";
+  }
+
   const digits = phone.replace(/\D/g, "");
 
   if (digits.length === 11 && digits.startsWith("7")) {
@@ -113,6 +145,25 @@ const formatPhone = (phone: string) => {
   }
 
   return phone;
+};
+
+const getTodayString = () => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getMonthStartString = () => {
+  const today = new Date();
+
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+
+  return `${year}-${month}-01`;
 };
 
 const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
@@ -139,6 +190,11 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     lastName: "",
     birthDate: "",
   });
+
+  const [subscription, setSubscription] =
+    useState<SubscriptionData | null>(null);
+
+  const [bonusPoints, setBonusPoints] = useState(0);
 
   const [showAddChild, setShowAddChild] = useState(false);
   const [expandedChild, setExpandedChild] = useState<string | null>(null);
@@ -185,6 +241,37 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       setError(null);
 
       try {
+        /*
+         * ---------------------------------------------------------
+         * 1. Загружаем актуальные данные пользователя
+         * ---------------------------------------------------------
+         */
+
+        const { data: currentUser, error: userError } = await supabase
+          .from("users")
+          .select("id, phone, first_name, last_name, bonus_points")
+          .eq("id", user.id)
+          .single();
+
+        if (userError) {
+          throw userError;
+        }
+
+        if (currentUser) {
+          setProfileData({
+            firstName: currentUser.first_name ?? "",
+            lastName: currentUser.last_name ?? "",
+          });
+
+          setBonusPoints(currentUser.bonus_points ?? 0);
+        }
+
+        /*
+         * ---------------------------------------------------------
+         * 2. Загружаем детей
+         * ---------------------------------------------------------
+         */
+
         const { data: children, error: childrenError } = await supabase
           .from("children")
           .select("id, first_name, last_name, birth_date, gender")
@@ -195,17 +282,82 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
           throw childrenError;
         }
 
-        const mappedChildren: ChildData[] = (children ?? []).map((child) => ({
-          id: child.id,
-          firstName: child.first_name,
-          lastName: child.last_name,
-          birthDate: child.birth_date,
-          gender: child.gender,
-        }));
+        const mappedChildren: ChildData[] = (children ?? []).map(
+          (child) => ({
+            id: child.id,
+            firstName: child.first_name,
+            lastName: child.last_name,
+            birthDate: child.birth_date,
+            gender: child.gender,
+          })
+        );
 
         setChildrenData(mappedChildren);
 
         const childIds = mappedChildren.map((child) => child.id);
+
+        /*
+         * ---------------------------------------------------------
+         * 3. Загружаем активный абонемент
+         * ---------------------------------------------------------
+         */
+
+        const { data: subscriptionData, error: subscriptionError } =
+          await supabase
+            .from("user_subscriptions")
+            .select(`
+              id,
+              lessons_total,
+              lessons_left,
+              price_per_lesson,
+              end_date,
+              is_active,
+              subscription_types (
+                id,
+                name,
+                is_individual
+              )
+            `)
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .order("end_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (subscriptionError) {
+          throw subscriptionError;
+        }
+
+        if (subscriptionData) {
+          const subscriptionType = Array.isArray(
+            subscriptionData.subscription_types
+          )
+            ? subscriptionData.subscription_types[0] ?? null
+            : subscriptionData.subscription_types ?? null;
+
+          setSubscription({
+            id: subscriptionData.id,
+            lessonsTotal: subscriptionData.lessons_total,
+            lessonsLeft: subscriptionData.lessons_left,
+            pricePerLesson: Number(
+              subscriptionData.price_per_lesson ?? 0
+            ),
+            endDate: subscriptionData.end_date,
+            isActive: subscriptionData.is_active,
+            name: subscriptionType?.name ?? "Абонемент",
+            isIndividual: Boolean(
+              subscriptionType?.is_individual
+            ),
+          });
+        } else {
+          setSubscription(null);
+        }
+
+        /*
+         * ---------------------------------------------------------
+         * Если детей нет — статистика и записи пустые
+         * ---------------------------------------------------------
+         */
 
         if (childIds.length === 0) {
           setStats({
@@ -218,68 +370,201 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
           return;
         }
 
-        const { data: bookings, error: bookingsError } = await supabase
-          .from("group_bookings")
+        /*
+         * ---------------------------------------------------------
+         * 4. Групповые записи
+         *
+         * ВАЖНО:
+         * lesson_date находится в group_bookings,
+         * а НЕ в group_schedules.
+         * ---------------------------------------------------------
+         */
+
+        const { data: groupBookings, error: groupBookingsError } =
+          await supabase
+            .from("group_bookings")
+            .select(`
+              id,
+              schedule_id,
+              child_id,
+              status,
+              lesson_date,
+              created_at,
+              group_schedules (
+                id,
+                activity_type_id,
+                activity_types (
+                  id,
+                  name
+                )
+              )
+            `)
+            .in("child_id", childIds)
+            .eq("user_id", user.id)
+            .order("lesson_date", { ascending: false });
+
+        if (groupBookingsError) {
+          throw groupBookingsError;
+        }
+
+        /*
+         * ---------------------------------------------------------
+         * 5. Индивидуальные записи
+         *
+         * lesson_date находится непосредственно
+         * в individual_bookings.
+         * ---------------------------------------------------------
+         */
+
+        const {
+          data: individualBookings,
+          error: individualBookingsError,
+        } = await supabase
+          .from("individual_bookings")
           .select(`
             id,
             schedule_id,
             child_id,
             status,
+            lesson_date,
             created_at,
-            group_schedules (
+            individual_schedules (
               id,
-              lesson_date,
-              activity_type_id,
-              activity_types (
+              individual_activity_id,
+              individual_activities (
                 id,
-                name
+                activity_type_id,
+                activity_types (
+                  id,
+                  name
+                )
               )
             )
           `)
           .in("child_id", childIds)
           .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+          .order("lesson_date", { ascending: false });
 
-        if (bookingsError) {
-          throw bookingsError;
+        if (individualBookingsError) {
+          throw individualBookingsError;
         }
 
-        const mappedBookings: BookingData[] = (bookings ?? []).map(
-          (booking: any) => {
-            const schedule = Array.isArray(booking.group_schedules)
-              ? booking.group_schedules[0] ?? null
-              : booking.group_schedules ?? null;
+        /*
+         * ---------------------------------------------------------
+         * 6. Приводим групповые записи к единому виду
+         * ---------------------------------------------------------
+         */
 
-            const activity = schedule
-              ? Array.isArray(schedule.activity_types)
-                ? schedule.activity_types[0] ?? null
-                : schedule.activity_types ?? null
-              : null;
+        const mappedGroupBookings: BookingData[] = (
+          groupBookings ?? []
+        ).map((booking: any) => {
+          const schedule = Array.isArray(
+            booking.group_schedules
+          )
+            ? booking.group_schedules[0] ?? null
+            : booking.group_schedules ?? null;
 
-            return {
-              id: booking.id,
-              schedule_id: booking.schedule_id,
-              child_id: booking.child_id,
-              status: booking.status,
-              created_at: booking.created_at,
-              schedule: schedule
-                ? {
-                    id: schedule.id,
-                    lesson_date: schedule.lesson_date,
-                    activity_type_id: schedule.activity_type_id,
-                    activity: activity
-                      ? {
-                          id: activity.id,
-                          name: activity.name,
-                        }
-                      : null,
-                  }
-                : null,
-            };
-          }
-        );
+          const activity = schedule
+            ? Array.isArray(schedule.activity_types)
+              ? schedule.activity_types[0] ?? null
+              : schedule.activity_types ?? null
+            : null;
 
-        const bookingsByChild: Record<string, BookingData[]> = {};
+          return {
+            id: booking.id,
+            schedule_id: booking.schedule_id,
+            child_id: booking.child_id,
+            status: booking.status,
+            lesson_date: booking.lesson_date,
+            created_at: booking.created_at,
+            type: "group",
+            activity: activity
+              ? {
+                  id: activity.id,
+                  name: activity.name,
+                }
+              : null,
+          };
+        });
+
+        /*
+         * ---------------------------------------------------------
+         * 7. Приводим индивидуальные записи к единому виду
+         * ---------------------------------------------------------
+         */
+
+        const mappedIndividualBookings: BookingData[] = (
+          individualBookings ?? []
+        ).map((booking: any) => {
+          const schedule = Array.isArray(
+            booking.individual_schedules
+          )
+            ? booking.individual_schedules[0] ?? null
+            : booking.individual_schedules ?? null;
+
+          const individualActivity = schedule
+            ? Array.isArray(
+                schedule.individual_activities
+              )
+              ? schedule.individual_activities[0] ?? null
+              : schedule.individual_activities ?? null
+            : null;
+
+          const activity = individualActivity
+            ? Array.isArray(
+                individualActivity.activity_types
+              )
+              ? individualActivity.activity_types[0] ?? null
+              : individualActivity.activity_types ?? null
+            : null;
+
+          return {
+            id: booking.id,
+            schedule_id: booking.schedule_id,
+            child_id: booking.child_id,
+            status: booking.status,
+            lesson_date: booking.lesson_date,
+            created_at: booking.created_at,
+            type: "individual",
+            activity: activity
+              ? {
+                  id: activity.id,
+                  name: activity.name,
+                }
+              : null,
+          };
+        });
+
+        /*
+         * ---------------------------------------------------------
+         * 8. Объединяем все записи
+         * ---------------------------------------------------------
+         */
+
+        const mappedBookings: BookingData[] = [
+          ...mappedGroupBookings,
+          ...mappedIndividualBookings,
+        ].sort((a, b) => {
+          return (
+            new Date(
+              `${b.lesson_date}T00:00:00`
+            ).getTime() -
+            new Date(
+              `${a.lesson_date}T00:00:00`
+            ).getTime()
+          );
+        });
+
+        /*
+         * ---------------------------------------------------------
+         * 9. Разбиваем записи по детям
+         * ---------------------------------------------------------
+         */
+
+        const bookingsByChild: Record<
+          string,
+          BookingData[]
+        > = {};
 
         mappedChildren.forEach((child) => {
           bookingsByChild[child.id] = [];
@@ -295,28 +580,29 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
         setChildBookings(bookingsByChild);
 
-        const currentDate = new Date();
+        /*
+         * ---------------------------------------------------------
+         * 10. Статистика
+         * ---------------------------------------------------------
+         */
 
-        const monthStart = new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-          1
+        const monthStart = getMonthStartString();
+
+        const monthBookings = mappedBookings.filter(
+          (booking) => {
+            return (
+              booking.lesson_date &&
+              booking.lesson_date >= monthStart
+            );
+          }
         );
-
-        const monthStartString = monthStart
-          .toISOString()
-          .split("T")[0];
-
-        const monthBookings = mappedBookings.filter((booking) => {
-          return (
-            booking.schedule?.lesson_date &&
-            booking.schedule.lesson_date >= monthStartString
-          );
-        });
 
         const directionIds = new Set(
           mappedBookings
-            .map((booking) => booking.schedule?.activity_type_id)
+            .map(
+              (booking) =>
+                booking.activity?.id
+            )
             .filter(Boolean)
         );
 
@@ -326,7 +612,10 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
           directionsCount: directionIds.size,
         });
       } catch (loadError: any) {
-        console.error("Ошибка загрузки профиля:", loadError);
+        console.error(
+          "Ошибка загрузки профиля:",
+          loadError
+        );
 
         setError(
           loadError?.message ||
@@ -340,17 +629,30 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     loadProfileData();
   }, [user?.id]);
 
-  const activeSubscription = useMemo(() => {
-    return user?.subscriptionActive
-      ? {
-          active: true,
-          endDate: user.subscriptionDate,
-        }
-      : {
-          active: false,
-          endDate: null,
-        };
-  }, [user]);
+  /*
+   * -----------------------------------------------------------
+   * Статус абонемента
+   * -----------------------------------------------------------
+   */
+
+  const subscriptionIsActuallyActive = useMemo(() => {
+    if (!subscription) {
+      return false;
+    }
+
+    const today = getTodayString();
+
+    return (
+      subscription.isActive &&
+      subscription.endDate >= today
+    );
+  }, [subscription]);
+
+  /*
+   * -----------------------------------------------------------
+   * Сохранение профиля
+   * -----------------------------------------------------------
+   */
 
   const handleSaveProfile = async () => {
     if (!user?.id) {
@@ -367,29 +669,51 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     setSuccessMessage(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          first_name: profileData.firstName.trim(),
-          last_name: profileData.lastName.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
+      const { data: updatedUser, error: updateError } =
+        await supabase
+          .from("users")
+          .update({
+            first_name: profileData.firstName.trim(),
+            last_name:
+              profileData.lastName.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id)
+          .select(
+            "id, first_name, last_name, phone, bonus_points"
+          )
+          .single();
 
       if (updateError) {
         throw updateError;
       }
 
+      if (updatedUser) {
+        setProfileData({
+          firstName: updatedUser.first_name ?? "",
+          lastName: updatedUser.last_name ?? "",
+        });
+
+        setBonusPoints(
+          updatedUser.bonus_points ?? 0
+        );
+      }
+
       await refreshUser();
 
       setEditProfile(false);
-      setSuccessMessage("Данные профиля успешно обновлены");
+      setSuccessMessage(
+        "Данные профиля успешно обновлены"
+      );
 
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
     } catch (saveError: any) {
-      console.error("Ошибка сохранения профиля:", saveError);
+      console.error(
+        "Ошибка сохранения профиля:",
+        saveError
+      );
 
       setError(
         saveError?.message ||
@@ -399,6 +723,12 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       setIsSavingProfile(false);
     }
   };
+
+  /*
+   * -----------------------------------------------------------
+   * Редактирование ребёнка
+   * -----------------------------------------------------------
+   */
 
   const openEditChild = (child: ChildData) => {
     setEditChildId(child.id);
@@ -414,7 +744,7 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
   };
 
   const handleSaveChild = async () => {
-    if (!editChildId) {
+    if (!editChildId || !user?.id) {
       return;
     }
 
@@ -433,16 +763,23 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     setSuccessMessage(null);
 
     try {
-      const { data: updatedChild, error: updateError } = await supabase
+      const {
+        data: updatedChild,
+        error: updateError,
+      } = await supabase
         .from("children")
         .update({
-          first_name: editChildData.firstName.trim(),
-          last_name: editChildData.lastName.trim() || null,
+          first_name:
+            editChildData.firstName.trim(),
+          last_name:
+            editChildData.lastName.trim() || null,
           birth_date: editChildData.birthDate,
         })
         .eq("id", editChildId)
-        .eq("parent_id", user?.id)
-        .select("id, first_name, last_name, birth_date, gender")
+        .eq("parent_id", user.id)
+        .select(
+          "id, first_name, last_name, birth_date, gender"
+        )
         .single();
 
       if (updateError) {
@@ -454,10 +791,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
           child.id === editChildId
             ? {
                 id: updatedChild.id,
-                firstName: updatedChild.first_name,
-                lastName: updatedChild.last_name,
-                birthDate: updatedChild.birth_date,
-                gender: updatedChild.gender,
+                firstName:
+                  updatedChild.first_name,
+                lastName:
+                  updatedChild.last_name,
+                birthDate:
+                  updatedChild.birth_date,
+                gender:
+                  updatedChild.gender,
               }
             : child
         )
@@ -466,13 +807,18 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       await refreshUser();
 
       setEditChildId(null);
-      setSuccessMessage("Данные ребёнка обновлены");
+      setSuccessMessage(
+        "Данные ребёнка обновлены"
+      );
 
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
     } catch (saveError: any) {
-      console.error("Ошибка сохранения ребёнка:", saveError);
+      console.error(
+        "Ошибка сохранения ребёнка:",
+        saveError
+      );
 
       setError(
         saveError?.message ||
@@ -482,6 +828,12 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       setIsSavingChild(false);
     }
   };
+
+  /*
+   * -----------------------------------------------------------
+   * Добавление ребёнка
+   * -----------------------------------------------------------
+   */
 
   const handleAddChild = async () => {
     if (!user?.id) {
@@ -503,15 +855,22 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     setSuccessMessage(null);
 
     try {
-      const { data: createdChild, error: insertError } = await supabase
+      const {
+        data: createdChild,
+        error: insertError,
+      } = await supabase
         .from("children")
         .insert({
           parent_id: user.id,
-          first_name: newChild.firstName.trim(),
-          last_name: newChild.lastName.trim() || null,
+          first_name:
+            newChild.firstName.trim(),
+          last_name:
+            newChild.lastName.trim() || null,
           birth_date: newChild.birthDate,
         })
-        .select("id, first_name, last_name, birth_date, gender")
+        .select(
+          "id, first_name, last_name, birth_date, gender"
+        )
         .single();
 
       if (insertError) {
@@ -520,10 +879,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
       const mappedChild: ChildData = {
         id: createdChild.id,
-        firstName: createdChild.first_name,
-        lastName: createdChild.last_name,
-        birthDate: createdChild.birth_date,
-        gender: createdChild.gender,
+        firstName:
+          createdChild.first_name,
+        lastName:
+          createdChild.last_name,
+        birthDate:
+          createdChild.birth_date,
+        gender:
+          createdChild.gender,
       };
 
       setChildrenData((currentChildren) => [
@@ -546,13 +909,18 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
       await refreshUser();
 
-      setSuccessMessage("Ребёнок успешно добавлен");
+      setSuccessMessage(
+        "Ребёнок успешно добавлен"
+      );
 
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
     } catch (addError: any) {
-      console.error("Ошибка добавления ребёнка:", addError);
+      console.error(
+        "Ошибка добавления ребёнка:",
+        addError
+      );
 
       setError(
         addError?.message ||
@@ -562,6 +930,12 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       setIsAddingChild(false);
     }
   };
+
+  /*
+   * -----------------------------------------------------------
+   * Удаление ребёнка
+   * -----------------------------------------------------------
+   */
 
   const removeChild = async (childId: string) => {
     if (!user?.id) {
@@ -576,6 +950,13 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       return;
     }
 
+    const childBookings =
+      Object.values(
+        childBookingsState
+      ).flat();
+
+    void childBookings;
+
     const confirmed = window.confirm(
       `Удалить ребёнка "${child.firstName}" из профиля?`
     );
@@ -589,23 +970,81 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     setSuccessMessage(null);
 
     try {
-      const { error: deleteError } = await supabase
-        .from("children")
-        .delete()
-        .eq("id", childId)
-        .eq("parent_id", user.id);
+      /*
+       * Проверяем групповые записи
+       */
+
+      const {
+        count: groupBookingCount,
+        error: groupCheckError,
+      } = await supabase
+        .from("group_bookings")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("child_id", childId)
+        .eq("user_id", user.id);
+
+      if (groupCheckError) {
+        throw groupCheckError;
+      }
+
+      /*
+       * Проверяем индивидуальные записи
+       */
+
+      const {
+        count: individualBookingCount,
+        error: individualCheckError,
+      } = await supabase
+        .from("individual_bookings")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("child_id", childId)
+        .eq("user_id", user.id);
+
+      if (individualCheckError) {
+        throw individualCheckError;
+      }
+
+      const totalChildBookings =
+        (groupBookingCount ?? 0) +
+        (individualBookingCount ?? 0);
+
+      if (totalChildBookings > 0) {
+        setError(
+          "Нельзя удалить ребёнка, у которого есть записи на занятия. Сначала отмените его записи."
+        );
+        return;
+      }
+
+      const { error: deleteError } =
+        await supabase
+          .from("children")
+          .delete()
+          .eq("id", childId)
+          .eq("parent_id", user.id);
 
       if (deleteError) {
         throw deleteError;
       }
 
       setChildrenData((currentChildren) =>
-        currentChildren.filter((item) => item.id !== childId)
+        currentChildren.filter(
+          (item) => item.id !== childId
+        )
       );
 
       setChildBookings((current) => {
-        const updated = { ...current };
+        const updated = {
+          ...current,
+        };
+
         delete updated[childId];
+
         return updated;
       });
 
@@ -613,17 +1052,22 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
       await refreshUser();
 
-      setSuccessMessage("Ребёнок удалён из профиля");
+      setSuccessMessage(
+        "Ребёнок удалён из профиля"
+      );
 
       setTimeout(() => {
         setSuccessMessage(null);
       }, 3000);
     } catch (deleteError: any) {
-      console.error("Ошибка удаления ребёнка:", deleteError);
+      console.error(
+        "Ошибка удаления ребёнка:",
+        deleteError
+      );
 
       if (deleteError?.code === "23503") {
         setError(
-          "Нельзя удалить ребёнка, у которого есть записи на занятия. Сначала отмените его записи."
+          "Нельзя удалить ребёнка, у которого есть связанные записи."
         );
       } else {
         setError(
@@ -635,6 +1079,13 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       setDeletingChildId(null);
     }
   };
+
+  /*
+   * Небольшой alias для текущих записей.
+   * Нужен только чтобы не ломать обработчик удаления.
+   */
+
+  const childBookingsState = childBookings;
 
   if (!user) {
     return (
@@ -666,12 +1117,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-32 animate-pulse rounded-3xl bg-secondary"
-              />
-            ))}
+            {Array.from({ length: 6 }).map(
+              (_, index) => (
+                <div
+                  key={index}
+                  className="h-32 animate-pulse rounded-3xl bg-secondary"
+                />
+              )
+            )}
           </div>
         </div>
       </div>
@@ -682,6 +1135,7 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
     <div className="animate-fade-in p-4 md:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
+
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
@@ -702,6 +1156,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             onClick={() => {
               setError(null);
               setSuccessMessage(null);
+
+              setProfileData({
+                firstName:
+                  user.firstName ?? "",
+                lastName:
+                  user.lastName ?? "",
+              });
+
               setEditProfile(true);
             }}
             className="flex h-10 w-10 items-center justify-center rounded-full gradient-primary text-primary-foreground"
@@ -741,7 +1203,8 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* Left column */}
+          {/* LEFT */}
+
           <div className="space-y-5">
             <div className="glass-card p-6 text-center">
               <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center rounded-full border-4 border-background bg-secondary">
@@ -749,7 +1212,7 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
               </div>
 
               <h2 className="text-xl font-bold text-primary-opacity">
-                {[user.firstName, user.lastName]
+                {[profileData.firstName, profileData.lastName]
                   .filter(Boolean)
                   .join(" ") || "Пользователь"}
               </h2>
@@ -759,7 +1222,8 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                   <User className="h-4 w-4 shrink-0 text-primary" />
 
                   <span>
-                    {user.firstName || "Имя не указано"}
+                    {profileData.firstName ||
+                      "Имя не указано"}
                   </span>
                 </div>
 
@@ -773,7 +1237,8 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
               </div>
             </div>
 
-            {/* Activity stats */}
+            {/* Activity */}
+
             <div className="glass-card p-5">
               <h3 className="mb-3 font-bold text-primary-opacity">
                 Активность
@@ -825,16 +1290,20 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             </button>
           </div>
 
-          {/* Center column */}
+          {/* CENTER */}
+
           <div className="space-y-5">
             <PremiumWidget
               compact
-              onSubscribeClick={() => onNavigate("subscribe")}
+              onSubscribeClick={() =>
+                onNavigate("subscribe")
+              }
             />
 
             <p className="text-center text-xs leading-5 text-secondary-opacity">
-              Подписку необходимо будет оплатить заранее. Сделать это можно,
-              написав в поддержку или лично по адресу Ясная 14к2.
+              Подписку необходимо будет оплатить
+              заранее. Сделать это можно, написав в
+              поддержку или лично по адресу Ясная 14к2.
             </p>
 
             <div className="grid grid-cols-2 gap-3">
@@ -842,11 +1311,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 <CreditCard className="mx-auto mb-2 h-6 w-6 text-primary" />
 
                 <p className="text-2xl font-bold text-primary-opacity">
-                  {user.subscriptionActive
-                    ? user.children.length > 0
-                      ? "—"
-                      : "—"
-                    : "0"}
+                  {subscription
+                    ? subscription.lessonsLeft
+                    : 0}
                 </p>
 
                 <p className="text-xs text-secondary-opacity">
@@ -858,7 +1325,7 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 <Award className="mx-auto mb-2 h-6 w-6 text-primary" />
 
                 <p className="text-2xl font-bold text-primary-opacity">
-                  {user.points}
+                  {bonusPoints}
                 </p>
 
                 <p className="text-xs text-secondary-opacity">
@@ -867,36 +1334,65 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
               </div>
             </div>
 
+            {/* Subscription */}
+
             <div className="glass-card p-5">
               <h3 className="mb-3 font-bold text-primary">
                 Ваш абонемент
               </h3>
 
-              {activeSubscription.active ? (
+              {subscription ? (
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-secondary-opacity">
+                      Абонемент
+                    </span>
+
+                    <span className="font-semibold text-primary-opacity">
+                      {subscription.name}
+                    </span>
+                  </div>
+
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-secondary-opacity">
                       Статус
                     </span>
 
-                    <span className="font-semibold text-emerald-500">
-                      Активен
+                    <span
+                      className={
+                        subscriptionIsActuallyActive
+                          ? "font-semibold text-emerald-500"
+                          : "font-semibold text-red-500"
+                      }
+                    >
+                      {subscriptionIsActuallyActive
+                        ? "Активен"
+                        : "Истёк"}
                     </span>
                   </div>
 
-                  {activeSubscription.endDate && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-secondary-opacity">
-                        Действует до
-                      </span>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-secondary-opacity">
+                      Осталось
+                    </span>
 
-                      <span className="font-semibold text-primary-opacity">
-                        {new Date(
-                          `${activeSubscription.endDate}T00:00:00`
-                        ).toLocaleDateString("ru-RU")}
-                      </span>
-                    </div>
-                  )}
+                    <span className="font-semibold text-primary-opacity">
+                      {subscription.lessonsLeft} из{" "}
+                      {subscription.lessonsTotal}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-secondary-opacity">
+                      Действует до
+                    </span>
+
+                    <span className="font-semibold text-primary-opacity">
+                      {formatBirthDate(
+                        subscription.endDate
+                      )}
+                    </span>
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -906,7 +1402,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
                   <button
                     type="button"
-                    onClick={() => onNavigate("subscribe")}
+                    onClick={() =>
+                      onNavigate("subscribe")
+                    }
                     className="mt-4 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
                   >
                     Выбрать абонемент
@@ -914,21 +1412,10 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </div>
               )}
             </div>
-
-            <div className="glass-card p-5">
-              <h3 className="mb-3 font-bold text-primary">
-                Зачем нужны баллы?
-              </h3>
-
-              <div className="space-y-1 text-sm text-secondary-opacity">
-                <p>100 баллов — дополнительное занятие</p>
-                <p>250 баллов — мастер-класс в подарок</p>
-                <p>500 баллов — игрушка на выбор</p>
-              </div>
-            </div>
           </div>
 
-          {/* Right column */}
+          {/* RIGHT */}
+
           <div className="space-y-5">
             <div>
               <div className="mb-3 flex items-center justify-between">
@@ -952,27 +1439,36 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                   </p>
 
                   <p className="mt-1 text-xs leading-5 text-secondary-opacity">
-                    Добавьте ребёнка, чтобы записывать его на занятия.
+                    Добавьте ребёнка, чтобы
+                    записывать его на занятия.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {childrenData.map((child) => {
-                    const childAge = calculateAge(child.birthDate);
-                    const bookings = childBookings[child.id] ?? [];
+                    const childAge =
+                      calculateAge(
+                        child.birthDate
+                      );
+
+                    const bookings =
+                      childBookings[child.id] ??
+                      [];
+
                     const childDirections = [
                       ...new Set(
                         bookings
                           .map(
                             (booking) =>
-                              booking.schedule?.activity?.name
+                              booking.activity?.name
                           )
                           .filter(Boolean)
                       ),
                     ];
 
                     const isExpanded =
-                      expandedChild === child.id;
+                      expandedChild ===
+                      child.id;
 
                     return (
                       <div key={child.id}>
@@ -984,15 +1480,31 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
                             <div className="min-w-0">
                               <span className="block truncate font-semibold text-primary-opacity">
-                                {[child.firstName, child.lastName]
+                                {[
+                                  child.firstName,
+                                  child.lastName,
+                                ]
                                   .filter(Boolean)
                                   .join(" ")}
                               </span>
 
                               <p className="text-xs text-secondary-opacity">
-                                {childAge !== null
-                                  ? `${childAge} ${childAge === 1 ? "год" : childAge >= 2 && childAge <= 4 ? "года" : "лет"}`
-                                  : formatBirthDate(child.birthDate)}
+                                {childAge !==
+                                null
+                                  ? `${childAge} ${
+                                      childAge ===
+                                      1
+                                        ? "год"
+                                        : childAge >=
+                                            2 &&
+                                          childAge <=
+                                            4
+                                        ? "года"
+                                        : "лет"
+                                    }`
+                                  : formatBirthDate(
+                                      child.birthDate
+                                    )}
                               </p>
                             </div>
                           </div>
@@ -1001,7 +1513,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                             <button
                               type="button"
                               onClick={() =>
-                                openEditChild(child)
+                                openEditChild(
+                                  child
+                                )
                               }
                               className="flex h-9 w-9 items-center justify-center rounded-full gradient-primary text-primary-foreground"
                             >
@@ -1012,27 +1526,35 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                               type="button"
                               onClick={() =>
                                 setExpandedChild(
-                                  isExpanded ? null : child.id
+                                  isExpanded
+                                    ? null
+                                    : child.id
                                 )
                               }
                               className="text-muted-foreground"
                             >
                               <ChevronDown
-                                className={`h-5 w-5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                className={`h-5 w-5 transition-transform ${
+                                  isExpanded
+                                    ? "rotate-180"
+                                    : ""
+                                }`}
                               />
                             </button>
                           </div>
                         </div>
 
                         {isExpanded && (
-                          <div className="glass-card mt-1 space-y-3 px-4 py-4">
+                          <div className="glass-card mt-1 space-y-4 px-4 py-4">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-secondary-opacity">
                                 Дата рождения
                               </span>
 
                               <span className="font-semibold text-primary-opacity">
-                                {formatBirthDate(child.birthDate)}
+                                {formatBirthDate(
+                                  child.birthDate
+                                )}
                               </span>
                             </div>
 
@@ -1051,9 +1573,12 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                                 Направления
                               </span>
 
-                              {childDirections.length > 0 ? (
+                              {childDirections.length >
+                              0 ? (
                                 <p className="mt-1 font-semibold leading-5 text-primary-opacity">
-                                  {childDirections.join(", ")}
+                                  {childDirections.join(
+                                    ", "
+                                  )}
                                 </p>
                               ) : (
                                 <p className="mt-1 text-xs text-secondary-opacity">
@@ -1062,17 +1587,71 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                               )}
                             </div>
 
+                            {bookings.length >
+                              0 && (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-secondary-opacity">
+                                  История занятий
+                                </p>
+
+                                {bookings
+                                  .slice(0, 5)
+                                  .map(
+                                    (
+                                      booking
+                                    ) => (
+                                      <div
+                                        key={
+                                          booking.id
+                                        }
+                                        className="rounded-xl bg-secondary/60 p-3"
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-semibold text-primary-opacity">
+                                              {booking
+                                                .activity
+                                                ?.name ??
+                                                "Занятие"}
+                                            </p>
+
+                                            <p className="mt-1 text-xs text-secondary-opacity">
+                                              {formatLessonDate(
+                                                booking.lesson_date
+                                              )}
+                                              {" · "}
+                                              {booking.type ===
+                                              "individual"
+                                                ? "Индивидуальное"
+                                                : "Групповое"}
+                                            </p>
+                                          </div>
+
+                                          <span className="shrink-0 text-[10px] font-semibold uppercase text-secondary-opacity">
+                                            {booking.status}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )
+                                  )}
+                              </div>
+                            )}
+
                             <button
                               type="button"
                               disabled={
-                                deletingChildId === child.id
+                                deletingChildId ===
+                                child.id
                               }
                               onClick={() =>
-                                removeChild(child.id)
+                                removeChild(
+                                  child.id
+                                )
                               }
                               className="flex items-center gap-1 text-xs text-destructive transition hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                              {deletingChildId === child.id ? (
+                              {deletingChildId ===
+                              child.id ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : (
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -1102,6 +1681,8 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
               Добавить ребёнка
             </button>
 
+            {/* Directions */}
+
             <div className="glass-card p-5">
               <h3 className="mb-3 font-bold text-primary-opacity">
                 Направления детей
@@ -1111,16 +1692,22 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 <div className="space-y-2">
                   {[
                     ...new Map(
-                      Object.values(childBookings)
+                      Object.values(
+                        childBookings
+                      )
                         .flat()
                         .filter(
                           (booking) =>
-                            booking.schedule?.activity
+                            booking.activity
                         )
-                        .map((booking) => [
-                          booking.schedule!.activity!.id,
-                          booking.schedule!.activity!.name,
-                        ])
+                        .map(
+                          (booking) => [
+                            booking.activity!
+                              .id,
+                            booking.activity!
+                              .name,
+                          ]
+                        )
                     ).values(),
                   ].map((direction) => (
                     <div
@@ -1128,6 +1715,7 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                       className="flex items-center gap-2 text-sm"
                     >
                       <div className="h-2 w-2 rounded-full bg-primary" />
+
                       <span className="text-primary-opacity">
                         {direction}
                       </span>
@@ -1136,7 +1724,8 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </div>
               ) : (
                 <p className="text-sm leading-6 text-secondary-opacity">
-                  Пока нет записей на направления.
+                  Пока нет записей на
+                  направления.
                 </p>
               )}
             </div>
@@ -1145,12 +1734,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       </div>
 
       {/* Edit Profile Modal */}
+
       {editProfile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={() =>
-              !isSavingProfile && setEditProfile(false)
+              !isSavingProfile &&
+              setEditProfile(false)
             }
           />
 
@@ -1158,7 +1749,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isSavingProfile}
-              onClick={() => setEditProfile(false)}
+              onClick={() =>
+                setEditProfile(false)
+              }
               className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <X className="h-4 w-4" />
@@ -1175,12 +1768,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={profileData.firstName}
+                  value={
+                    profileData.firstName
+                  }
                   onChange={(event) =>
-                    setProfileData((current) => ({
-                      ...current,
-                      firstName: event.target.value,
-                    }))
+                    setProfileData(
+                      (current) => ({
+                        ...current,
+                        firstName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Введите имя"
@@ -1193,12 +1791,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={profileData.lastName}
+                  value={
+                    profileData.lastName
+                  }
                   onChange={(event) =>
-                    setProfileData((current) => ({
-                      ...current,
-                      lastName: event.target.value,
-                    }))
+                    setProfileData(
+                      (current) => ({
+                        ...current,
+                        lastName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Введите фамилию"
@@ -1214,12 +1817,16 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                   <Phone className="h-4 w-4 text-primary" />
 
                   <span className="text-sm text-secondary-opacity">
-                    {formatPhone(user.phone)}
+                    {formatPhone(
+                      user.phone
+                    )}
                   </span>
                 </div>
 
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Номер телефона используется для входа и не изменяется здесь.
+                  Номер телефона используется
+                  для входа и не изменяется
+                  здесь.
                 </p>
               </div>
             </div>
@@ -1227,7 +1834,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isSavingProfile}
-              onClick={handleSaveProfile}
+              onClick={
+                handleSaveProfile
+              }
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl gradient-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSavingProfile ? (
@@ -1247,12 +1856,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       )}
 
       {/* Edit Child Modal */}
+
       {editChildId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={() =>
-              !isSavingChild && setEditChildId(null)
+              !isSavingChild &&
+              setEditChildId(null)
             }
           />
 
@@ -1260,7 +1871,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isSavingChild}
-              onClick={() => setEditChildId(null)}
+              onClick={() =>
+                setEditChildId(null)
+              }
               className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <X className="h-4 w-4" />
@@ -1277,12 +1890,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={editChildData.firstName}
+                  value={
+                    editChildData.firstName
+                  }
                   onChange={(event) =>
-                    setEditChildData((current) => ({
-                      ...current,
-                      firstName: event.target.value,
-                    }))
+                    setEditChildData(
+                      (current) => ({
+                        ...current,
+                        firstName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Имя ребёнка"
@@ -1295,12 +1913,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={editChildData.lastName}
+                  value={
+                    editChildData.lastName
+                  }
                   onChange={(event) =>
-                    setEditChildData((current) => ({
-                      ...current,
-                      lastName: event.target.value,
-                    }))
+                    setEditChildData(
+                      (current) => ({
+                        ...current,
+                        lastName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Фамилия ребёнка"
@@ -1314,12 +1937,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
                 <input
                   type="date"
-                  value={editChildData.birthDate}
+                  value={
+                    editChildData.birthDate
+                  }
                   onChange={(event) =>
-                    setEditChildData((current) => ({
-                      ...current,
-                      birthDate: event.target.value,
-                    }))
+                    setEditChildData(
+                      (current) => ({
+                        ...current,
+                        birthDate:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                 />
@@ -1329,7 +1957,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isSavingChild}
-              onClick={handleSaveChild}
+              onClick={
+                handleSaveChild
+              }
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl gradient-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSavingChild ? (
@@ -1349,12 +1979,14 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
       )}
 
       {/* Add Child Modal */}
+
       {showAddChild && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-foreground/30 backdrop-blur-sm"
             onClick={() =>
-              !isAddingChild && setShowAddChild(false)
+              !isAddingChild &&
+              setShowAddChild(false)
             }
           />
 
@@ -1362,7 +1994,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isAddingChild}
-              onClick={() => setShowAddChild(false)}
+              onClick={() =>
+                setShowAddChild(false)
+              }
               className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50"
             >
               <X className="h-4 w-4" />
@@ -1379,12 +2013,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={newChild.firstName}
+                  value={
+                    newChild.firstName
+                  }
                   onChange={(event) =>
-                    setNewChild((current) => ({
-                      ...current,
-                      firstName: event.target.value,
-                    }))
+                    setNewChild(
+                      (current) => ({
+                        ...current,
+                        firstName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Введите имя"
@@ -1397,12 +2036,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
                 </label>
 
                 <input
-                  value={newChild.lastName}
+                  value={
+                    newChild.lastName
+                  }
                   onChange={(event) =>
-                    setNewChild((current) => ({
-                      ...current,
-                      lastName: event.target.value,
-                    }))
+                    setNewChild(
+                      (current) => ({
+                        ...current,
+                        lastName:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                   placeholder="Введите фамилию"
@@ -1416,12 +2060,17 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
 
                 <input
                   type="date"
-                  value={newChild.birthDate}
+                  value={
+                    newChild.birthDate
+                  }
                   onChange={(event) =>
-                    setNewChild((current) => ({
-                      ...current,
-                      birthDate: event.target.value,
-                    }))
+                    setNewChild(
+                      (current) => ({
+                        ...current,
+                        birthDate:
+                          event.target.value,
+                      })
+                    )
                   }
                   className={inputClass}
                 />
@@ -1431,7 +2080,9 @@ const ProfilePage = ({ onNavigate }: ProfilePageProps) => {
             <button
               type="button"
               disabled={isAddingChild}
-              onClick={handleAddChild}
+              onClick={
+                handleAddChild
+              }
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl gradient-primary py-3.5 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isAddingChild ? (

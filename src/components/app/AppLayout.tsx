@@ -15,8 +15,8 @@ import {
   User,
   Menu,
   X,
-  Star,
 } from "lucide-react";
+import logo from "@/assets/logo.jpg";
 
 type TabId = "home" | "calendar" | "directions" | "notifications" | "profile";
 type ViewId = TabId | "settings" | "subscribe";
@@ -71,12 +71,11 @@ const AppLayout = () => {
       {/* Top Header */}
       <header className="fixed top-0 left-0 right-0 z-50 glass">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-              <Star className="w-4 h-4 text-primary-foreground" />
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white">
+              <img src={logo} alt="Дети на планете" className="h-full w-full object-contain" />
             </div>
-            <span className="font-bold text-sm text-primary-opacity">Дети на планете</span>
+            <span className="text-sm font-bold text-primary-opacity">Дети на планете</span>
           </div>
 
           {/* Desktop nav items in header */}
@@ -87,11 +86,10 @@ const AppLayout = () => {
                 <button
                   key={tab.id}
                   onClick={() => navigateTo(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm transition-all ${
-                    isActive
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm transition-all ${isActive
                       ? "gradient-primary text-primary-foreground font-semibold"
                       : "text-secondary-opacity hover:bg-secondary"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="w-4 h-4" />
                   <span>{tab.label}</span>
@@ -123,11 +121,10 @@ const AppLayout = () => {
                 <button
                   key={tab.id}
                   onClick={() => navigateTo(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${
-                    activeTab === tab.id
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${activeTab === tab.id
                       ? "gradient-primary text-primary-foreground font-semibold"
                       : "text-secondary-opacity hover:bg-secondary"
-                  }`}
+                    }`}
                 >
                   <tab.icon className="w-5 h-5" />
                   <span>{tab.label}</span>

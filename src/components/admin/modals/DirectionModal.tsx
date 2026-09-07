@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   ImagePlus,
@@ -8,13 +8,13 @@ import {
   Trash2,
   Upload,
   X,
-} from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import type {
   ActivityType,
   SubscriptionType,
   Teacher,
-} from '../pages/DirectionsPage';
+} from "../pages/DirectionsPage";
 
 interface DirectionModalProps {
   direction: ActivityType | null;
@@ -25,7 +25,7 @@ interface DirectionModalProps {
   onError: (message: string) => void;
 }
 
-const STORAGE_BUCKET = 'activity-images';
+const STORAGE_BUCKET = "activity-images";
 
 export default function DirectionModal({
   direction,
@@ -37,25 +37,25 @@ export default function DirectionModal({
 }: DirectionModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [name, setName] = useState(direction?.name ?? '');
-  const [description, setDescription] = useState(direction?.description ?? '');
-  const [teacherId, setTeacherId] = useState(direction?.teacher_id ?? '');
+  const [name, setName] = useState(direction?.name ?? "");
+  const [description, setDescription] = useState(
+    direction?.description ?? ""
+  );
+  const [teacherId, setTeacherId] = useState(direction?.teacher_id ?? "");
   const [subscriptionTypeId, setSubscriptionTypeId] = useState(
-    direction?.subscription_type_id ?? '',
+    direction?.subscription_type_id ?? ""
   );
   const [duration, setDuration] = useState(
-    direction?.duration_minutes ?? 60,
+    direction?.duration_minutes ?? 60
   );
-  const [maxPlaces, setMaxPlaces] = useState(
-    direction?.max_places ?? 8,
-  );
+  const [maxPlaces, setMaxPlaces] = useState(direction?.max_places ?? 8);
   const [isActive, setIsActive] = useState(
-    direction?.is_active ?? true,
+    direction?.is_active ?? true
   );
 
-  const [imageUrl, setImageUrl] = useState(direction?.image ?? '');
+  const [imageUrl, setImageUrl] = useState(direction?.image ?? "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState(direction?.image ?? '');
+  const [previewUrl, setPreviewUrl] = useState(direction?.image ?? "");
 
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -63,8 +63,10 @@ export default function DirectionModal({
   const isEditing = Boolean(direction);
 
   const selectedSubscription = subscriptionTypes.find(
-    (subscription) => subscription.id === subscriptionTypeId,
+    (subscription) => subscription.id === subscriptionTypeId
   );
+
+  const isIndividual = Boolean(selectedSubscription?.is_individual);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -82,20 +84,20 @@ export default function DirectionModal({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) {
+      if (event.key === "Escape" && !saving) {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose, saving]);
 
   const handleFileChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
 
@@ -103,13 +105,13 @@ export default function DirectionModal({
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      onError('Можно загрузить только изображение');
+    if (!file.type.startsWith("image/")) {
+      onError("Можно загрузить только изображение");
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      onError('Размер изображения не должен превышать 5 МБ');
+      onError("Размер изображения не должен превышать 5 МБ");
       return;
     }
 
@@ -125,7 +127,7 @@ export default function DirectionModal({
 
     try {
       const extension =
-        selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+        selectedFile.name.split(".").pop()?.toLowerCase() || "jpg";
 
       const fileName = `${crypto.randomUUID()}.${extension}`;
       const filePath = `directions/${fileName}`;
@@ -133,7 +135,7 @@ export default function DirectionModal({
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(filePath, selectedFile, {
-          cacheControl: '3600',
+          cacheControl: "3600",
           upsert: false,
           contentType: selectedFile.type,
         });
@@ -154,41 +156,136 @@ export default function DirectionModal({
 
   const handleRemoveImage = () => {
     setSelectedFile(null);
-    setImageUrl('');
-    setPreviewUrl('');
+    setImageUrl("");
+    setPreviewUrl("");
 
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const validate = () => {
     if (!name.trim()) {
-      onError('Введите название направления');
+      onError("Введите название направления");
       return false;
     }
 
     if (!teacherId) {
-      onError('Выберите преподавателя');
+      onError("Выберите преподавателя");
       return false;
     }
 
     if (!subscriptionTypeId) {
-      onError('Выберите тип подписки');
+      onError("Выберите тип подписки");
       return false;
     }
 
     if (duration <= 0) {
-      onError('Длительность должна быть больше 0 минут');
+      onError("Длительность должна быть больше 0 минут");
       return false;
     }
 
     if (maxPlaces <= 0) {
-      onError('Количество мест должно быть больше 0');
+      onError("Количество мест должно быть больше 0");
+      return false;
+    }
+
+    if (isIndividual && maxPlaces !== 1) {
+      onError(
+        "Для индивидуального направления количество мест должно быть равно 1"
+      );
       return false;
     }
 
     return true;
+  };
+
+  const syncIndividualActivity = async (
+    activityTypeId: string
+  ) => {
+    if (!selectedSubscription) {
+      return;
+    }
+
+    if (!selectedSubscription.is_individual) {
+      return;
+    }
+
+    const pricePerLesson = Number(
+      selectedSubscription.base_price_per_lesson
+    );
+
+    const teacherPayoutPerLesson = Number(
+      selectedSubscription.teacher_payout_per_lesson
+    );
+
+    if (!Number.isFinite(pricePerLesson)) {
+      throw new Error(
+        "У выбранной индивидуальной подписки некорректная цена занятия."
+      );
+    }
+
+    if (!Number.isFinite(teacherPayoutPerLesson)) {
+      throw new Error(
+        "У выбранной индивидуальной подписки некорректная выплата педагогу."
+      );
+    }
+
+    const { data: existingIndividualActivity, error: findError } =
+      await supabase
+        .from("individual_activities")
+        .select("id")
+        .eq("activity_type_id", activityTypeId)
+        .maybeSingle();
+
+    if (findError) {
+      throw findError;
+    }
+
+    const payload = {
+      activity_type_id: activityTypeId,
+      teacher_id: teacherId,
+      price_per_lesson: pricePerLesson,
+      teacher_payout_per_lesson: teacherPayoutPerLesson,
+      duration_minutes: duration,
+      is_active: isActive,
+    };
+
+    if (existingIndividualActivity) {
+      const { error } = await supabase
+        .from("individual_activities")
+        .update(payload)
+        .eq("id", existingIndividualActivity.id);
+
+      if (error) {
+        throw error;
+      }
+
+      return;
+    }
+
+    const { error } = await supabase
+      .from("individual_activities")
+      .insert(payload);
+
+    if (error) {
+      throw error;
+    }
+  };
+
+  const deactivateIndividualActivity = async (
+    activityTypeId: string
+  ) => {
+    const { error } = await supabase
+      .from("individual_activities")
+      .update({
+        is_active: false,
+      })
+      .eq("activity_type_id", activityTypeId);
+
+    if (error) {
+      throw error;
+    }
   };
 
   const handleSave = async () => {
@@ -197,6 +294,7 @@ export default function DirectionModal({
     }
 
     setSaving(true);
+    onError("");
 
     try {
       const finalImageUrl = await uploadImage();
@@ -207,36 +305,58 @@ export default function DirectionModal({
         teacher_id: teacherId,
         subscription_type_id: subscriptionTypeId,
         duration_minutes: duration,
-        max_places: maxPlaces,
+        max_places: isIndividual ? 1 : maxPlaces,
         image: finalImageUrl,
         is_active: isActive,
       };
 
+      let activityTypeId = direction?.id ?? "";
+
       if (direction) {
         const { error } = await supabase
-          .from('activity_types')
+          .from("activity_types")
           .update(payload)
-          .eq('id', direction.id);
+          .eq("id", direction.id);
 
         if (error) {
           throw error;
         }
+
+        activityTypeId = direction.id;
       } else {
-        const { error } = await supabase
-          .from('activity_types')
-          .insert(payload);
+        const { data, error } = await supabase
+          .from("activity_types")
+          .insert(payload)
+          .select("id")
+          .single();
 
         if (error) {
           throw error;
         }
+
+        if (!data?.id) {
+          throw new Error(
+            "Направление создано, но его ID не был получен."
+          );
+        }
+
+        activityTypeId = data.id;
+      }
+
+      if (isIndividual) {
+        await syncIndividualActivity(activityTypeId);
+      } else {
+        await deactivateIndividualActivity(activityTypeId);
       }
 
       onSaved();
     } catch (error) {
+      console.error("DirectionModal save error:", error);
+
       onError(
         error instanceof Error
           ? error.message
-          : 'Не удалось сохранить направление',
+          : "Не удалось сохранить направление"
       );
     } finally {
       setSaving(false);
@@ -258,11 +378,11 @@ export default function DirectionModal({
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-slate-900">
                 {isEditing
-                  ? 'Редактировать направление'
-                  : 'Новое направление'}
+                  ? "Редактировать направление"
+                  : "Новое направление"}
               </h2>
 
-              {selectedSubscription?.is_individual && (
+              {isIndividual && (
                 <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-semibold text-violet-600">
                   Индивидуальное
                 </span>
@@ -271,8 +391,8 @@ export default function DirectionModal({
 
             <p className="mt-1 text-sm text-slate-500">
               {isEditing
-                ? 'Изменение параметров существующего направления'
-                : 'Добавь направление и укажи, по какой подписке оно доступно'}
+                ? "Изменение параметров существующего направления"
+                : "Добавь направление и укажи, по какой подписке оно доступно"}
             </p>
           </div>
 
@@ -339,7 +459,7 @@ export default function DirectionModal({
                         {teacher.first_name}
                         {teacher.last_name
                           ? ` ${teacher.last_name}`
-                          : ''}
+                          : ""}
                       </option>
                     ))}
                   </SelectField>
@@ -386,8 +506,8 @@ export default function DirectionModal({
 
                         <p className="mt-1 text-xs leading-5 text-slate-500">
                           {selectedSubscription.is_individual
-                            ? 'Направление будет доступно только для индивидуальных занятий.'
-                            : `Подписка предоставляет доступ к направлениям этого и более низкого уровня.`}
+                            ? "Будет автоматически создано индивидуальное занятие, которое появится в разделе «Инд.» расписания."
+                            : "Подписка предоставляет доступ к направлениям этого и более низкого уровня."}
                         </p>
                       </div>
                     </div>
@@ -396,14 +516,14 @@ export default function DirectionModal({
                       <SubscriptionInfo
                         label="Цена занятия"
                         value={formatPrice(
-                          selectedSubscription.base_price_per_lesson,
+                          selectedSubscription.base_price_per_lesson
                         )}
                       />
 
                       <SubscriptionInfo
                         label="Педагогу"
                         value={formatPrice(
-                          selectedSubscription.teacher_payout_per_lesson,
+                          selectedSubscription.teacher_payout_per_lesson
                         )}
                       />
 
@@ -413,8 +533,12 @@ export default function DirectionModal({
                       />
 
                       <SubscriptionInfo
-                        label="Срок"
-                        value="1 месяц"
+                        label="Тип"
+                        value={
+                          selectedSubscription.is_individual
+                            ? "Индивидуальная"
+                            : "Групповая"
+                        }
                       />
                     </div>
                   </div>
@@ -438,12 +562,22 @@ export default function DirectionModal({
 
                   <NumberInput
                     label="Максимум мест *"
-                    value={maxPlaces}
+                    value={isIndividual ? 1 : maxPlaces}
                     onChange={setMaxPlaces}
                     min={1}
                     placeholder="8"
+                    disabled={isIndividual}
                   />
                 </div>
+
+                {isIndividual && (
+                  <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2.5">
+                    <p className="text-xs leading-5 text-violet-700">
+                      Индивидуальное занятие рассчитано на одного ребёнка.
+                      Максимум мест автоматически установлен в 1.
+                    </p>
+                  </div>
+                )}
               </section>
 
               <section>
@@ -454,21 +588,18 @@ export default function DirectionModal({
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Если выключить, направление не будет доступно для новых записей.
+                      Если выключить, направление не будет доступно для
+                      новых записей.
                     </p>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => setIsActive((value) => !value)}
-                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                      isActive ? 'bg-[#646cff]' : 'bg-slate-300'
-                    }`}
+                    className={`relative h-7 w-12 shrink-0 rounded-full transition ${isActive ? "bg-[#646cff]" : "bg-slate-300"}`}
                   >
                     <span
-                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-                        isActive ? 'left-6' : 'left-1'
-                      }`}
+                      className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${isActive ? "left-6" : "left-1"}`}
                     />
                   </button>
                 </div>
@@ -486,7 +617,7 @@ export default function DirectionModal({
                   <div className="relative aspect-square">
                     <img
                       src={previewUrl}
-                      alt={name || 'Фото направления'}
+                      alt={name || "Фото направления"}
                       className="h-full w-full object-cover"
                     />
 
@@ -574,12 +705,14 @@ export default function DirectionModal({
             {saving || uploading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {uploading ? 'Загружаем фото...' : 'Сохраняем...'}
+                {uploading ? "Загружаем фото..." : "Сохраняем..."}
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                {isEditing ? 'Сохранить изменения' : 'Создать направление'}
+                {isEditing
+                  ? "Сохранить изменения"
+                  : "Создать направление"}
               </>
             )}
           </button>
@@ -637,12 +770,14 @@ function NumberInput({
   onChange,
   min,
   placeholder,
+  disabled = false,
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   min: number;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -655,11 +790,12 @@ function NumberInput({
         min={min}
         value={value}
         placeholder={placeholder}
+        disabled={disabled}
         onChange={(event) => {
           const value = Number(event.target.value);
           onChange(Number.isNaN(value) ? min : value);
         }}
-        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none transition focus:border-[#646cff]/40 focus:ring-4 focus:ring-[#646cff]/10"
+        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-800 outline-none transition focus:border-[#646cff]/40 focus:ring-4 focus:ring-[#646cff]/10 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
       />
     </label>
   );
@@ -705,11 +841,14 @@ function SubscriptionInfo({
       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 text-xs font-semibold text-slate-700">{value}</p>
+
+      <p className="mt-1 text-xs font-semibold text-slate-700">
+        {value}
+      </p>
     </div>
   );
 }
 
 function formatPrice(value: number) {
-  return `${new Intl.NumberFormat('ru-RU').format(value)} ₽`;
+  return `${new Intl.NumberFormat("ru-RU").format(Number(value))} ₽`;
 }

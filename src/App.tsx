@@ -7,6 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminEntry from "./pages/AdminEntry";
+import TeacherLogin from "./pages/TeacherLogin";
+import TeacherApp from "./pages/TeacherApp";
 
 const queryClient = new QueryClient();
 
@@ -19,10 +21,16 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
+
             <Route
-              path="/FGVhygvR7fkjtdjyCDJKytfkuyg/*"
+              path="/FGVhygvR7fkjtdjyCDJKytfkuy/*"
               element={<AdminEntry />}
             />
+
+            <Route path="/teacher" element={<TeacherLogin />} />
+
+            <Route path="/teacher/app" element={<TeacherApp />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
